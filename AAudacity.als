@@ -20,17 +20,6 @@ fact { // TODO: Add to sig
 	_window in Track one -> Window
 }
 
-sig Window {
-	_start : Int -> Time,
-	_end : Int -> Time,
-	_winsamples : (seq Sample) -> Time
-}
-
-one sig History {
-	_history : (seq Time) -> Time,
-	_present : Int -> Time
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 //                                             Predicates                                                //
@@ -71,7 +60,7 @@ pred ChangeHistory[t, t' : Time] {
 
 pred Init[t : Time] {
 	no _tracks.t
-	countAllSamples[Clipboard, t] = 0
+	Empty[Clipboard, t]
 	History._history.t = 0 -> t
 	History._present.t = 0	
 	_action.t = InitAction
@@ -91,25 +80,6 @@ pred Import[t, t' : Time, track : Track] {
 	_end.t' = _end.t ++ track._window -> lastContSampleIdx[track, t] // Maximum zoom out
 	_winsamples.t' = _winsamples.t ++ track._window -> readAllSamples[track, t] // Maximum zoom out
 	_action.t' = ImportAction
-	ChangeHistory[t, t']
-}
-
-pred Cut[t, t' : Time, track : Track, from, to : Int] {
-	// Precondition
-	track in _tracks.t // the track belongs to the project's tracks list
-	from <= to // there are at least one sample selected to cut
-	track._window._start.t <= from // the first sample to cut is in the visible window
-	track._window._end.t >= to // the last sample to cut is in the visible window
-
-	// Preserved
-	_tracks.t' = _tracks.t
-	all otherTrack : _tracks.t' - track | readAllSamples[otherTrack, t'] = readAllSamples[otherTrack, t]
-
-	// Updated
-	readSamples[track, 0, from.sub[1], t'] = readSamples[track, 0, from.sub[1], t]
-	readAllSamples[Clipboard, t'] = readSamples[track, from, to, t]
-	readSamples[track, from, lastContSampleIdx[track, t'], t'] = readSamples[track, to.add[1], lastContSampleIdx[track, t], t]
-	CutNoMove[t, t', track, from, to] or CutMove[t, t', track, from, to] or CutZoomIn[t, t', track, from, to]
 	ChangeHistory[t, t']
 }
 
@@ -149,6 +119,25 @@ pred CutZoomIn[t, t' : Time, track : Track, from, to : Int] {
 	_end.t' = _end.t ++ track._window -> countAllSamples[track, t'] // the visible window shrinking to display all the remaining samples
 	_winsamples.t' = _winsamples.t ++ track._window -> readAllSamples[track, t']
 	_action.t = CutZoomInAction
+}
+
+pred Cut[t, t' : Time, track : Track, from, to : Int] {
+	// Precondition
+	track in _tracks.t // the track belongs to the project's tracks list
+	from <= to // there are at least one sample selected to cut
+	track._window._start.t <= from // the first sample to cut is in the visible window
+	track._window._end.t >= to // the last sample to cut is in the visible window
+
+	// Preserved
+	_tracks.t' = _tracks.t
+	all otherTrack : _tracks.t' - track | readAllSamples[otherTrack, t'] = readAllSamples[otherTrack, t]
+
+	// Updated
+	readSamples[track, 0, from.sub[1], t'] = readSamples[track, 0, from.sub[1], t]
+	readAllSamples[Clipboard, t'] = readSamples[track, from, to, t]
+	readSamples[track, from, lastContSampleIdx[track, t'], t'] = readSamples[track, to.add[1], lastContSampleIdx[track, t], t]
+	CutNoMove[t, t', track, from, to] or CutMove[t, t', track, from, to] or CutZoomIn[t, t', track, from, to]
+	ChangeHistory[t, t']
 }
 
 pred Paste[t, t' : Time, track : Track, into : Int] {
@@ -262,15 +251,6 @@ pred SystemOperation[t, t' : Time] {
 			or Paste[t, t', track, i]
 			or ZoomIn[t, t', track, i, j]
 			or ZoomOut[t, t', track, i, j]
-}
-
-
-////////////////////////////////////////////////////////////////////////////////////////////
-//                                                Functions                                               //
-////////////////////////////////////////////////////////////////////////////////////////////
-
-fun current[t : Time] : Time {
-	(History._history.t)[History._present.t]
 }
 
 

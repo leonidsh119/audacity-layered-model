@@ -8,11 +8,16 @@ open BFContainer
 //                                             Signatures                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////
 
+one sig Clipboard extends BFContainer {}
+
 sig Track extends BFContainer {
-	_tracks : set Time
+	_tracks : set Time,
+	_window : Window
 }
 
-one sig Clipboard extends BFContainer {}
+fact { // TODO: Add to sig
+	_window in Track one -> Window
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,13 +25,44 @@ one sig Clipboard extends BFContainer {}
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 pred Inv[t : Time] {
-	// all the blocks in DirManager are the blocks from Tracks and Clipboard
-	// Others?
+    // Track has at least 2 samples
+	all track : _tracks.t | countAllSamples[track, t] > 1
+
+	// Window's indices are in boundaries of tracks samples sequence and has at least 2 visible samples
+	all track : _tracks.t |  #(track._window._winsamples.t) > 1 &&
+								track._window._start.t >= 0 && 
+								track._window._end.t > track._window._start.t &&
+								(track._window._end.t).sub[track._window._start.t].add[1] = #(track._window._winsamples.t)
+
+	// Window's start index is smaller than window's end index and their difference equals to the amount of visible samples
+	all track : _tracks.t | track._window._end.t < countAllSamples[track, t]
+
+	// All samples in window are from samples of track in the window's range
+	all track : _tracks.t | track._window._winsamples.t = readSamples[track, track._window._start.t, track._window._end.t, t]
+
+	// Validate history 
+	Equiv[t, current[t]]
+}
+
+pred Equiv[t1 : Time, t2 : Time] {
+	all cont : BFContainer | readAllSamples[cont, t1] = readAllSamples[cont, t2]
+	_tracks.t1 = _tracks.t2
+	_start.t1 = _start.t2
+	_end.t1 = _end.t2
+	_winsamples.t1 = _winsamples.t2
+}
+
+pred ChangeHistory[t, t' : Time] {
+	History._history.t' = ((History._history.t).subseq[0, History._present.t]).add[t']  
+	History._present.t' = (History._present.t).add[1] 
 }
 
 pred Init[t : Time] {
 	no _tracks.t
-	no Clipboard._blocks.t
+	Empty[Clipboard, t]
+	History._history.t = 0 -> t
+	History._present.t = 0	
+	_action.t = InitAction
 }
 
 pred Import[t, t' : Time, track : Track] {
@@ -103,6 +139,32 @@ pred Paste[t, t' : Time, track : Track, into : Int] {
 	}
 }
 
+pred Undo[t, t' : Time] {
+	// Precondition
+	History._present.t > 0
+
+	// Preserved
+	History._history.t' = History._history.t
+
+	// Updated
+	History._present.t' = (History._present.t).sub[1]
+	Equiv[t', current[t']]
+	_action.t' = UndoAction
+}
+
+pred Redo[t, t' : Time] {
+	// Precondition
+	History._present.t < (#(History._history.t)).sub[1]
+
+	// Preserved
+	History._history.t' = History._history.t
+
+	// Updated
+	History._present.t' = (History._present.t).add[1]
+	Equiv[t', current[t']]
+	_action.t' = RedoAction
+}
+
 pred Split[cont : BFContainer, blockIdx : Int, head, tail : BlockFile, t, t' : Time] {
 	// Precondition
 	countAllBlocks[cont, t] > 1
@@ -153,6 +215,15 @@ pred Delete[cont : BFContainer, blockIdx : Int, t, t' : Time] {
 	_blocks.t' = _blocks.t ++ cont -> delete[cont._blocks.t, blockIdx]
 }
 
+pred SystemOperation[t, t' : Time] {
+		some track : Track, i, j : Int |
+			Import[t, t', track]
+			or Cut[t, t', track, i, j]
+			or Paste[t, t', track, i]
+			//or ZoomIn[t, t', track, i, j]
+			//or ZoomOut[t, t', track, i, j]
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 //                                                   Facts                                                   //
@@ -161,8 +232,9 @@ pred Delete[cont : BFContainer, blockIdx : Int, t, t' : Time] {
 fact {
 	Init[first]
 	all t, t' : Time | t -> t' in next => 
-		some track : Track |
-			Import[t, t', track]
+		(SystemOperation[t, t'] and ChangeHistory[t, t']) 
+		or Undo[t, t'] 
+		or Redo[t, t']
 }
 
 
