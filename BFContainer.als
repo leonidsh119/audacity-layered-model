@@ -27,6 +27,16 @@ pred Empty[cont : BFContainer, t : Time] {
 	countAllSamples[cont, t] = 0
 }
 
+pred Validate[cont : BFContainer, t : Time] {
+	some cont._blocks.t // Has some blocks
+	all block : cont._blocks.t | some block._samples // No Empty blocks
+}
+
+pred Preserve[cont : BFContainer, t, t' : Time] {
+	_blocks.t' = _blocks.t
+	readAllSamples[cont, t] = readAllSamples[cont, t']
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 //                                                Functions                                               //
@@ -69,6 +79,10 @@ fun countSamples[cont : BFContainer, from, to : Int, t : Time] : Int {
 fun readSamples[cont : BFContainer, from, to : Int, t : Time] : seq Sample {
 	// add/sub are needd to align indices from [from, to] range into zero-starting range
 	{ i : range[0, to.sub[from].add[1]], sample : readSample[cont, i.add[from], t] }
+}
+
+fun lastContSampleIdx[cont : BFContainer, t : Time] : Int {
+	countAllSamples[cont, t].sub[1]
 }
 
 // For the given sample index in the entire track provides the block index the sample belongs to

@@ -45,7 +45,7 @@ pred Inv[t : Time] {
 }
 
 pred Equiv[t1 : Time, t2 : Time] {
-	all cont : BFContainer | readAllSamples[cont, t1] = readAllSamples[cont, t2]
+	all cont : Track + Clipboard | Preserve[cont, t1, t2]
 	_tracks.t1 = _tracks.t2
 	_start.t1 = _start.t2
 	_end.t1 = _end.t2
@@ -68,14 +68,30 @@ pred Init[t : Time] {
 pred Import[t, t' : Time, track : Track] {
 	// Precondition
 	track !in _tracks.t // this is a new track that doesn't belongs to the prject's tracks list
-	some track._blocks.t // the new track is not empty
-	all block : BlockFile | block in Int.(track._blocks.t) => some block._samples
+	Validate[track, t]
 
 	// Preserved
-	_blocks.t' = _blocks.t
+	all cont : Track + Clipboard | Preserve[cont, t, t']
 
 	// Updated
 	_tracks.t' = _tracks.t + track
+	_start.t' = _start.t ++ track._window -> 0 // Maximum zoom out
+	_end.t' = _end.t ++ track._window -> lastContSampleIdx[track, t] // Maximum zoom out
+	_winsamples.t' = _winsamples.t ++ track._window -> readAllSamples[track, t] // Maximum zoom out
+	_action.t' = ImportAction
+	ChangeHistory[t, t']
+}
+
+pred CutNoMove[t, t' : Time, track : Track, from, to : Int] {
+
+}
+
+pred CutMove[t, t' : Time, track : Track, from, to : Int] {
+
+}
+
+pred CutZoomIn[t, t' : Time, track : Track, from, to : Int] {
+
 }
 
 pred Cut[t, t' : Time, track : Track, from, to : Int] {
@@ -139,32 +155,6 @@ pred Paste[t, t' : Time, track : Track, into : Int] {
 	}
 }
 
-pred Undo[t, t' : Time] {
-	// Precondition
-	History._present.t > 0
-
-	// Preserved
-	History._history.t' = History._history.t
-
-	// Updated
-	History._present.t' = (History._present.t).sub[1]
-	Equiv[t', current[t']]
-	_action.t' = UndoAction
-}
-
-pred Redo[t, t' : Time] {
-	// Precondition
-	History._present.t < (#(History._history.t)).sub[1]
-
-	// Preserved
-	History._history.t' = History._history.t
-
-	// Updated
-	History._present.t' = (History._present.t).add[1]
-	Equiv[t', current[t']]
-	_action.t' = RedoAction
-}
-
 pred Split[cont : BFContainer, blockIdx : Int, head, tail : BlockFile, t, t' : Time] {
 	// Precondition
 	countAllBlocks[cont, t] > 1
@@ -213,6 +203,43 @@ pred Delete[cont : BFContainer, blockIdx : Int, t, t' : Time] {
 
 	// Updated
 	_blocks.t' = _blocks.t ++ cont -> delete[cont._blocks.t, blockIdx]
+}
+
+pred Preserve[t, t' : Time] {
+	all cont : Track + Clipboard | Preserve[cont, t, t']
+	_tracks.t' = _tracks.t
+	_start.t' = _start.t
+	_end.t' = _end.t
+	_winsamples.t' = _winsamples.t
+	_history.t' = _history.t
+	_present.t' = _present.t
+	_action.t' = SkipAction
+}
+
+pred Undo[t, t' : Time] {
+	// Precondition
+	History._present.t > 0
+
+	// Preserved
+	History._history.t' = History._history.t
+
+	// Updated
+	History._present.t' = (History._present.t).sub[1]
+	Equiv[t', current[t']]
+	_action.t' = UndoAction
+}
+
+pred Redo[t, t' : Time] {
+	// Precondition
+	History._present.t < (#(History._history.t)).sub[1]
+
+	// Preserved
+	History._history.t' = History._history.t
+
+	// Updated
+	History._present.t' = (History._present.t).add[1]
+	Equiv[t', current[t']]
+	_action.t' = RedoAction
 }
 
 pred SystemOperation[t, t' : Time] {

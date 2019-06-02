@@ -46,7 +46,7 @@ pred Inv[t : Time] {
 }
 
 pred Equiv[t1 : Time, t2 : Time] {
-	all cont : AContainer | readAllSamples[cont, t1] = readAllSamples[cont, t2]
+	all cont : Track + Clipboard | Preserve[cont, t1, t2]
 	_tracks.t1 = _tracks.t2
 	_start.t1 = _start.t2
 	_end.t1 = _end.t2
@@ -69,10 +69,10 @@ pred Init[t : Time] {
 pred Import[t, t' : Time, track : Track] {
 	// Precondition
 	track !in _tracks.t // this is a new track that doesn't belongs to the prject's tracks list
-	countAllSamples[track, t] > 1 // the new track is not empty. Asumming at least 2 samples for being able to define a window
+	Validate[track, t]
 
 	// Preserved
-	all cont : AContainer | readAllSamples[cont, t'] = readAllSamples[cont, t]
+	all cont : Track + Clipboard | Preserve[cont, t, t']
 
 	// Updated
 	_tracks.t' = _tracks.t + track
@@ -206,6 +206,17 @@ pred ZoomOut[t , t' : Time, track : Track, newStart, newEnd : Int] {
 	ChangeHistory[t, t']
 }
 
+pred Preserve[t, t' : Time] {
+	all cont : Track + Clipboard | Preserve[cont, t, t']
+	_tracks.t' = _tracks.t
+	_start.t' = _start.t
+	_end.t' = _end.t
+	_winsamples.t' = _winsamples.t
+	_history.t' = _history.t
+	_present.t' = _present.t
+	_action.t' = SkipAction
+}
+
 pred Undo[t, t' : Time] {
 	// Precondition
 	History._present.t > 0
@@ -230,18 +241,6 @@ pred Redo[t, t' : Time] {
 	History._present.t' = (History._present.t).add[1]
 	Equiv[t', current[t']]
 	_action.t' = RedoAction
-}
-
-// Represents a state preservation betweent to times
-pred Skip[t, t' : Time] {
-	all cont : AContainer | readAllSamples[cont, t] = readAllSamples[cont, t']
-	_tracks.t' = _tracks.t
-	_start.t' = _start.t
-	_end.t' = _end.t
-	_winsamples.t' = _winsamples.t
-	_history.t' = _history.t
-	_present.t' = _present.t
-	_action.t' = SkipAction
 }
 
 pred SystemOperation[t, t' : Time] {
