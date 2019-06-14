@@ -29,13 +29,46 @@ pred Empty[cont : BFContainer, t : Time] {
 
 pred Validate[cont : BFContainer, t : Time] {
 	some cont._blocks.t // Has some blocks
-	all block : cont._blocks.t | some block._samples // No Empty blocks
+	all block : cont._blocks.t | #(block._samples) > 0 // No Empty blocks
 }
 
 pred Preserve[cont : BFContainer, t, t' : Time] {
-	_blocks.t' = _blocks.t
+	cont._blocks.t' = cont._blocks.t
+	all block : cont._blocks | block.t._samples = block.t'._samples
 	readAllSamples[cont, t] = readAllSamples[cont, t']
-	// Is that enough?
+}
+
+pred ExtractSamples[contSrc, contOut : BFContainer, from, to : Int, t, t' : Time] {
+	let firstCutBlockIndex = blockIndexForSampleIndex[contSrc, from, t],  lastCutBlockIndex = blockIndexForSampleIndex[contSrc, to, t] | {
+		// Precondition
+		all block : contSrc._blocks.t | #(block._samples) > 0	
+		sampleIndexInBlockForSampleIndex[contSrc, from, t] = 0 // "from" is the first sample in its block
+		sampleIndexInBlockForSampleIndex[contSrc, to, t] = sub[#(blockForBlockIndex[contSrc, lastCutBlockIndex, t]._samples), 1] // "to" is the last sample in its block
+		countAllBlocks[contOut, t] = sub[lastCutBlockIndex, firstCutBlockIndex] // required number of blocks in clipboard. what skip action achieves that?
+
+		// Preserved
+		contSrc._blocks.t' = contSrc._blocks.t
+		all i : range[0, countAllBlocks[contSrc, t]] - range[firstCutBlockIndex, lastCutBlockIndex] | blockForBlockIndex[contSrc, i, t']._samples = blockForBlockIndex[contSrc, i, t]._samples
+
+		// Updated
+		all i : range[firstCutBlockIndex, lastCutBlockIndex] | no blockForBlockIndex[contSrc, i, t']._samples
+		all i : range[firstCutBlockIndex, lastCutBlockIndex] | blockForBlockIndex[contOut, sub[i, firstCutBlockIndex], t']._samples = blockForBlockIndex[contSrc, i, t]._samples
+	}
+}
+
+pred InsertSamples[cont1, cont2 : BFContainer, into : Int, t, t' : Time] {
+	let firstEmptyBlockIndex = add[blockIndexForSampleIndex[cont1, sub[into, 1], t], 1],  lastEmptyBlockIndex = add[firstEmptyBlockIndex, countAllBlocks[cont2, t]] | {
+		// Precondition
+		all block : cont1._blocks | block.t' = block.t // The assumption is that all needed blocks are already prepared and in this method only filled up with samples
+		all i : range[firstEmptyBlockIndex, lastEmptyBlockIndex] | #(blockForBlockIndex[cont1, i, t]._samples) = 0
+		all i : range[0, countAllBlocks[cont1, t]] - range[firstEmptyBlockIndex, lastEmptyBlockIndex] | #(blockForBlockIndex[cont1, i, t]._samples) > 0
+
+		// Preserved
+		all i : range[0, countAllBlocks[cont1, t]] - range[firstEmptyBlockIndex, lastEmptyBlockIndex] | blockForBlockIndex[cont1, i, t']._samples = blockForBlockIndex[cont1, i, t]._samples
+
+		// Updated
+		all i : range[firstEmptyBlockIndex, lastEmptyBlockIndex] | blockForBlockIndex[cont1, i, t']._samples = blockForBlockIndex[cont2, sub[i, firstEmptyBlockIndex], t]._samples
+	}
 }
 
 

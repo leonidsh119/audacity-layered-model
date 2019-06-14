@@ -130,12 +130,10 @@ pred Cut[t, t' : Time, track : Track, from, to : Int] {
 
 	// Preserved
 	_tracks.t' = _tracks.t
-	all otherTrack : _tracks.t' - track | readAllSamples[otherTrack, t'] = readAllSamples[otherTrack, t]
+	all cont : Track - track | Preserve[cont, t, t']
 
 	// Updated
-	readSamples[track, 0, from.sub[1], t'] = readSamples[track, 0, from.sub[1], t]
-	readAllSamples[Clipboard, t'] = readSamples[track, from, to, t]
-	readSamples[track, from, lastContSampleIdx[track, t'], t'] = readSamples[track, to.add[1], lastContSampleIdx[track, t], t]
+	ExtractSamples[track, Clipboard, from, to, t, t']
 	CutNoMove[t, t', track, from, to] or CutMove[t, t', track, from, to] or CutZoomIn[t, t', track, from, to]
 	ChangeHistory[t, t']
 }
@@ -148,14 +146,12 @@ pred Paste[t, t' : Time, track : Track, into : Int] {
 
 	// Preserved
 	_tracks.t' = _tracks.t
+	all cont : Track + Clipboard - track | Preserve[cont, t, t']
 	_start.t' = _start.t // use the same window size and location in track
 	_end.t' = _end.t // use the same window size and location in track
-	all otherTrack : _tracks.t' - track | readAllSamples[otherTrack, t'] = readAllSamples[otherTrack, t]
 
 	// Updated
-	readSamples[track, 0, into.sub[1], t'] = readSamples[track, 0, into.sub[1], t]
-	readSamples[track, into, into.add[countAllSamples[Clipboard, t]].sub[1], t'] = readAllSamples[Clipboard, t]
-	readSamples[track, into.add[countAllSamples[Clipboard, t]], lastContSampleIdx[track, t'], t'] = readSamples[track, into, lastContSampleIdx[track, t], t]
+	InsertSamples[track, Clipboard, into, t, t']
 	_winsamples.t' = _winsamples.t ++ track._window -> readSamples[track, track._window._start.t, track._window._end.t, t'] // Refresh displayed samples according to the remaining window start and end, but with the new track samples sequence
 	_action.t' = PasteAction
 	ChangeHistory[t, t']

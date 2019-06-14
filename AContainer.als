@@ -27,6 +27,18 @@ pred Preserve[cont : AContainer, t, t' : Time] {
 	readAllSamples[cont, t] = readAllSamples[cont, t']
 }
 
+pred ExtractSamples[contSrc, contOut : AContainer, from, to : Int, t, t' : Time] {
+	readSamples[contSrc, 0, from.sub[1], t'] = readSamples[contSrc, 0, from.sub[1], t]
+	readAllSamples[contOut, t'] = readSamples[contSrc, from, to, t]
+	readSamples[contSrc, from, lastContSampleIdx[contSrc, t'], t'] = readSamples[contSrc, to.add[1], lastContSampleIdx[contSrc, t], t]
+}
+
+pred InsertSamples[cont1, cont2 : AContainer, into : Int, t, t' : Time] {
+	readSamples[cont1, 0, into.sub[1], t'] = readSamples[cont1, 0, into.sub[1], t]
+	readSamples[cont1, into, into.add[countAllSamples[cont2, t]].sub[1], t'] = readAllSamples[cont2, t]
+	readSamples[cont1, into.add[countAllSamples[cont2, t]], lastContSampleIdx[cont1, t'], t'] = readSamples[cont1, into, lastContSampleIdx[cont1, t], t]
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 //                                                Functions                                               //

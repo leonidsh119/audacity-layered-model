@@ -83,76 +83,77 @@ pred Import[t, t' : Time, track : Track] {
 }
 
 pred CutNoMove[t, t' : Time, track : Track, from, to : Int] {
+	// Precondition
+	to.sub[from.add[1]] <= countSamples[track, to.add[1], countAllSamples[track, t], t] // number for cut samples is SMALLER than number of sequences from the left of the visible winfow
 
+	// Preserved
+	_start.t' = _start.t // use the same window size and location in track
+	_end.t' = _end.t // use the same window size and location in track
+
+	// Updated
+	_winsamples.t' = _winsamples.t ++ track._window -> readSamples[track, track._window._start.t', track._window._end.t', t'] // Refresh displayed samples according to the remaining window start and end, but with the new track samples sequence
+	_action.t = CutNoMoveAction
 }
 
 pred CutMove[t, t' : Time, track : Track, from, to : Int] {
+	// Precondition
+	to.sub[from.add[1]] > countSamples[track, to.add[1], countAllSamples[track, t], t] // number for cut samples is LARGER than number of sequences from the left of the visible winfow, but...
+	to.sub[from.add[1]] <= countSamples[track, to.add[1], countAllSamples[track, t], t].add[countSamples[track, 0, from.sub[1], t]] // number for cut samples is SMALLER than number of sequences from the left AND from the right of the visible winfow, but...
 
+	// Preserved
+	_end.t' = _end.t // visible vindow is moved to the end of the track
+
+	// Updated
+	_start.t' = _start.t ++ track._window -> track._window._end.t'.sub[track._window._end.t.sub[track._window._start.t]] // moved visible window size is preserved
+	_winsamples.t' = _winsamples.t ++ track._window -> readSamples[track, track._window._start.t', track._window._end.t', t'] // Refresh displayed samples according to the remaining window start and end, but with the new track samples sequence
+	_action.t = CutMoveAction
 }
 
 pred CutZoomIn[t, t' : Time, track : Track, from, to : Int] {
+	// Precondition
+	to.sub[from.add[1]] > countSamples[track, to.add[1], countAllSamples[track, t], t].add[countSamples[track, 0, from.sub[1], t]] // number for cut samples is LARGER than number of sequences from the left AND from the right of the visible winfow
 
+	// Updated
+	_start.t' = _start.t ++ track._window -> 0 // the visible window shrinking to display all the remaining samples
+	_end.t' = _end.t ++ track._window -> countAllSamples[track, t'] // the visible window shrinking to display all the remaining samples
+	_winsamples.t' = _winsamples.t ++ track._window -> readAllSamples[track, t']
+	_action.t = CutZoomInAction
 }
 
 pred Cut[t, t' : Time, track : Track, from, to : Int] {
-// Abstract Model
 	// Precondition
 	track in _tracks.t // the track belongs to the project's tracks list
 	from <= to // there are at least one sample selected to cut
-	from >= 0
-	to <= countAllSamples[track, t]
+	track._window._start.t <= from // the first sample to cut is in the visible window
+	track._window._end.t >= to // the last sample to cut is in the visible window
 
 	// Preserved
 	_tracks.t' = _tracks.t
-	all otherTrack : _tracks.t' - track | readAllSamples[otherTrack, t'] = readAllSamples[otherTrack, t]
+	all cont : Track - track | Preserve[cont, t, t']
 
-// Concrete Model
-	let firstCutBlockIndex = blockIndexForSampleIndex[track, from, t],  lastCutBlockIndex = blockIndexForSampleIndex[track, to, t] | {
-		// Precondition
-		all block : track._blocks.t | #(block._samples) > 0
-		sampleIndexInBlockForSampleIndex[track, from, t] = 0 // "from" is the first sample in its block
-		sampleIndexInBlockForSampleIndex[track, to, t] = sub[#(blockForBlockIndex[track, lastCutBlockIndex, t]._samples), 1] // "to" is the last sample in its block
-		countAllBlocks[Clipboard, t] = sub[lastCutBlockIndex, firstCutBlockIndex] // required number of blocks in clipboard. what skip action achieves that?
-
-		// Preserved
-		_blocks.t' = _blocks.t
-		all otherTrack : _tracks.t' - track, block : otherTrack._blocks | block.t'._samples = block.t._samples
-		all i : range[0, countAllBlocks[track, t]] - range[firstCutBlockIndex, lastCutBlockIndex] | blockForBlockIndex[track, i, t']._samples = blockForBlockIndex[track, i, t]._samples
-
-		// Updated
-		all i : range[firstCutBlockIndex, lastCutBlockIndex] | no blockForBlockIndex[track, i, t']._samples
-		all i : range[firstCutBlockIndex, lastCutBlockIndex] | blockForBlockIndex[Clipboard, sub[i, firstCutBlockIndex], t']._samples = blockForBlockIndex[track, i, t]._samples
-	}
+	// Updated
+	ExtractSamples[track, Clipboard, from, to, t, t']
+	CutNoMove[t, t', track, from, to] or CutMove[t, t', track, from, to] or CutZoomIn[t, t', track, from, to]
+	ChangeHistory[t, t']
 }
 
-// NOTE: this operation has stronger precondition than in abstract model to ensure that all the required effects of Skip functions is done.
-// However the Update part is the same.
 pred Paste[t, t' : Time, track : Track, into : Int] {
-// Abstract Model
 	// Precondition
 	track in _tracks.t // the track belongs to the project's tracks list
-	into >= 0
-	into <= countAllSamples[track, t]
+	track._window._start.t <= into // the paste location is in the visible window (start)
+	track._window._end.t >= into // the paste location is in the visible window (end)
 
 	// Preserved
 	_tracks.t' = _tracks.t
-	all otherTrack : _tracks.t' - track | readAllSamples[otherTrack, t'] = readAllSamples[otherTrack, t]
+	all cont : Track + Clipboard - track | Preserve[cont, t, t']
+	_start.t' = _start.t // use the same window size and location in track
+	_end.t' = _end.t // use the same window size and location in track
 
-// Concrete Model
-	let firstEmptyBlockIndex = add[blockIndexForSampleIndex[track, sub[into, 1], t], 1],  lastEmptyBlockIndex = add[firstEmptyBlockIndex, countAllBlocks[Clipboard, t]] | {
-		// Precondition
-		all i : range[firstEmptyBlockIndex, lastEmptyBlockIndex] | #(blockForBlockIndex[track, i, t]._samples) = 0
-		all i : range[0, countAllBlocks[track, t]] - range[firstEmptyBlockIndex, lastEmptyBlockIndex] | #(blockForBlockIndex[track, i, t]._samples) > 0
-
-		// Preserved
-		_blocks.t' = _blocks.t
-		all otherTrack : _tracks.t' - track, block : otherTrack._blocks | block.t'._samples = block.t._samples
-		all block : Clipboard._blocks | block.t'._samples = block.t._samples
-		all i : range[0, countAllBlocks[track, t]] - range[firstEmptyBlockIndex, lastEmptyBlockIndex] | blockForBlockIndex[track, i, t']._samples = blockForBlockIndex[track, i, t]._samples
-
-		// Updated
-		all i : range[firstEmptyBlockIndex, lastEmptyBlockIndex] | blockForBlockIndex[track, i, t']._samples = blockForBlockIndex[Clipboard, sub[i, firstEmptyBlockIndex], t]._samples
-	}
+	// Updated
+	InsertSamples[track, Clipboard, into, t, t']
+	_winsamples.t' = _winsamples.t ++ track._window -> readSamples[track, track._window._start.t, track._window._end.t, t'] // Refresh displayed samples according to the remaining window start and end, but with the new track samples sequence
+	_action.t' = PasteAction
+	ChangeHistory[t, t']
 }
 
 pred ZoomIn[t , t' : Time, track : Track, newStart, newEnd : Int] {
