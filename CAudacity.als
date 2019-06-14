@@ -155,6 +155,51 @@ pred Paste[t, t' : Time, track : Track, into : Int] {
 	}
 }
 
+pred ZoomIn[t , t' : Time, track : Track, newStart, newEnd : Int] {
+	// Precondition
+	track in _tracks.t // the track belongs to the project's tracks list
+	#(track._window._winsamples.t) > 2 // the window can shrink
+	newEnd.sub[newStart] < (track._window._end.t).sub[track._window._start.t] // new window is smaller than the old one
+	newStart >= 0 // new window boundaries are inside the track's samples (start)
+	newStart >= track._window._start.t // new window boundaries are inside old one's (start)
+	newEnd <= track._window._end.t // new window boundaries are inside old one's (end)
+	newEnd.sub[newStart] > 1 // new window will have the minimum required size
+	
+	// Preserved
+	_tracks.t' = _tracks.t
+	all cont : Track + Clipboard | Preserve[cont, t, t']
+
+	// Updated
+	_start.t' = _start.t ++ track._window -> newStart
+	_end.t' = _end.t ++ track._window -> newEnd
+	_winsamples.t' = _winsamples.t ++ track._window -> readSamples[track, newStart, newEnd, t]
+	_action.t' = ZoomInAction
+	ChangeHistory[t, t']
+}
+
+pred ZoomOut[t , t' : Time, track : Track, newStart, newEnd : Int] {
+	// Precondition
+	track in _tracks.t // the track belongs to the project's tracks list
+	(#(track._window._winsamples.t)).sub[countAllSamples[track, t]]  > 0  // the window can grow
+	newEnd.sub[newStart] > (track._window._end.t).sub[track._window._start.t] // new window is larger than the old one
+	newStart <= track._window._start.t // new window boundaries are outside old one's (start)
+	newEnd >= track._window._end.t // new window boundaries are outside old one's (end)
+	newStart >= 0 // new window boundaries are inside the track's samples (start)
+	newEnd < countAllSamples[track, t] // new window boundaries are inside the track's samples (end)
+	newStart < newEnd // new window is a positive range
+
+	// Preserved
+	_tracks.t' = _tracks.t
+	all cont : Track + Clipboard | Preserve[cont, t, t']
+
+	// Updated
+	_start.t' = _start.t ++ track._window -> newStart
+	_end.t' = _end.t ++ track._window -> newEnd
+	_winsamples.t' = _winsamples.t ++ track._window -> readSamples[track, newStart, newEnd, t]
+	_action.t' = ZoomOutAction
+	ChangeHistory[t, t']
+}
+
 pred Split[cont : BFContainer, blockIdx : Int, head, tail : BlockFile, t, t' : Time] {
 	// Precondition
 	countAllBlocks[cont, t] > 1
@@ -247,8 +292,8 @@ pred SystemOperation[t, t' : Time] {
 			Import[t, t', track]
 			or Cut[t, t', track, i, j]
 			or Paste[t, t', track, i]
-			//or ZoomIn[t, t', track, i, j]
-			//or ZoomOut[t, t', track, i, j]
+			or ZoomIn[t, t', track, i, j]
+			or ZoomOut[t, t', track, i, j]
 }
 
 

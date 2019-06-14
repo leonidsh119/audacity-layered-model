@@ -173,12 +173,12 @@ pred ZoomIn[t , t' : Time, track : Track, newStart, newEnd : Int] {
 	
 	// Preserved
 	_tracks.t' = _tracks.t
-	all cont : AContainer | readAllSamples[cont, t'] = readAllSamples[cont, t]
+	all cont : Track + Clipboard | Preserve[cont, t, t']
 
 	// Updated
 	_start.t' = _start.t ++ track._window -> newStart
 	_end.t' = _end.t ++ track._window -> newEnd
-    _winsamples.t' = _winsamples.t ++ track._window -> readSamples[track, newStart, newEnd, t]
+	_winsamples.t' = _winsamples.t ++ track._window -> readSamples[track, newStart, newEnd, t]
 	_action.t' = ZoomInAction
 	ChangeHistory[t, t']
 }
@@ -196,7 +196,7 @@ pred ZoomOut[t , t' : Time, track : Track, newStart, newEnd : Int] {
 
 	// Preserved
 	_tracks.t' = _tracks.t
-	all cont : AContainer | readAllSamples[cont, t'] = readAllSamples[cont, t]
+	all cont : Track + Clipboard | Preserve[cont, t, t']
 
 	// Updated
 	_start.t' = _start.t ++ track._window -> newStart

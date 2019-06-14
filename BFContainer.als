@@ -35,6 +35,7 @@ pred Validate[cont : BFContainer, t : Time] {
 pred Preserve[cont : BFContainer, t, t' : Time] {
 	_blocks.t' = _blocks.t
 	readAllSamples[cont, t] = readAllSamples[cont, t']
+	// Is that enough?
 }
 
 
