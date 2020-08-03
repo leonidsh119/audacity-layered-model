@@ -1,13 +1,15 @@
 module AContainer
 
-open CommonAudacity
+open Time
+open Sample
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+//                                             Signatures                                                //
+////////////////////////////////////////////////////////////////////////////////////////////
 
 abstract sig AContainer extends Container {
 	_samples : (seq Sample) -> Time
-}
-
-fact { // TODO: Add to sig
-	_id in AContainer lone -> ID
 }
 
 
@@ -15,15 +17,15 @@ fact { // TODO: Add to sig
 //                                             Predicates                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-pred Empty[cont : AContainer, t : Time] {
+pred EmptyContainer[cont : AContainer, t : Time] {
 	countAllSamples[cont, t] = 0
 }
 
-pred Validate[cont : AContainer, t : Time] {
+pred ValidateContainer[cont : AContainer, t : Time] {
 	countAllSamples[cont, t] > 1 // Not empty. Asumming at least 2 samples for being able to define a window
 }
 
-pred Preserve[cont : AContainer, t, t' : Time] {
+pred PreserveContainer[cont : AContainer, t, t' : Time] {
 	readAllSamples[cont, t] = readAllSamples[cont, t']
 }
 
